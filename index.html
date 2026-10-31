@@ -537,135 +537,211 @@ function fairQ3(){
 }
 
 /* 幽靈海域：逐步方向操控 */
-const outward=[
-  ["⬆️","向北航行","海面平靜，遠處有微弱燈光。"],
-  ["➡️","向東航行","霧氣變濃，請留意航道。"],
-  ["⬇️","向南航行","海怪突然從浪底竄出！船身受到撞擊，耐久 -1。"],
-  ["➡️","向東航行","你看見海面浮起一圈金色光芒。"],
-  ["⬆️","向北航行","寶藏就在前方！你取得了星砂寶箱。"]
-];
+const W = 6, H = 6;
+const port = {x:0,y:0};
+const treasure = {x:4,y:2};
 
-const inward=[
-  ["⬇️","向南返航","沿著燈塔光線往南。"],
-  ["⬅️","向西返航","避開礁石，往西行進。"],
-  ["⬇️","向南返航","港口已經出現在眼前！"]
-];
+const directions = {
+  北:[0,-1],
+  南:[0,1],
+  東:[1,0],
+  西:[-1,0]
+};
 
-function seaStart(){
-  state.seaStep=0;
-  state.seaTreasure=false;
-  state.seaHP=4;
-  state.seaSupplies=2;
-  seaShow();
+const events = {
+  "2,1":"monster",
+  "1,3":"supply",
+  "3,3":"fog"
+};
+
+let game, selected = null;
+
+function newGame() {
+  game = {
+    x:0, y:0,
+    hp:3,
+    supply:1,
+    steps:0,
+    found:false,
+    visited:new Set(["0,0"]),
+    events:new Set(),
+    done:false,
+    failed:false
+  };
+
+  selected = null;
+  document.getElementById("result").hidden = true;
+  document.getElementById("message").textContent =
+    "寶藏藏在海域深處，找到它，再回到出發港口。";
+  document.getElementById("instruction").textContent =
+    "船長，選擇航行方向吧！";
+
+  render();
 }
 
-function seaShow(){
-  const arr=state.seaTreasure?inward:outward;
-  const idx=state.seaStep;
+function render() {
+  document.getElementById("hp").textContent =
+    "❤️".repeat(game.hp) + "🖤".repeat(3-game.hp);
 
-  if(idx>=arr.length){
-    if(!state.seaTreasure){
-      state.seaTreasure=true;
-      state.seaStep=0;
-      seaShow();
-    }else{
-      complete("sea","圖案：羅盤・星砂・波浪","幽靈船長的航海羅盤");
+  document.getElementById("supply").textContent = game.supply;
+  document.getElementById("steps").textContent = game.steps;
+
+  document.getElementById("phase").textContent =
+    game.done ? "成功返航" :
+    game.found ? "攜寶返航" : "尋找寶藏";
+
+  const map = document.getElementById("map");
+  map.innerHTML = "";
+
+  for(let y=0;y<H;y++) {
+    for(let x=0;x<W;x++) {
+      const key = ${x},${y};
+      const cell = document.createElement("div");
+      cell.className = "tile";
+
+      let icon = "🌊";
+
+      if(x===game.x && y===game.y) {
+        icon = "🚢";
+        cell.classList.add("current");
+      } else if(x===0 && y===0) {
+        icon = "⚓";
+      } else if(game.found && x===4 && y===2) {
+        icon = "📦";
+      } else if(game.visited.has(key)) {
+        const event = events[key];
+        icon = event === "monster" ? "🐙" :
+               event === "supply" ? "🧰" :
+               event === "fog" ? "🌫️" : "·";
+      }
+
+      cell.textContent = icon;
+      map.appendChild(cell);
     }
+  }
+
+  document.querySelectorAll("[data-dir]").forEach(btn=>{
+    btn.disabled = game.done || game.failed;
+  });
+
+  document.getElementById("sail").disabled =
+    !selected || game.done || game.failed;
+
+  document.getElementById("repair").disabled =
+    game.done || game.failed ||
+    game.supply<=0 || game.hp>=3;
+
+  document.getElementById("selected").textContent =
+    selected ? 已選擇：向${selected}航行 : "尚未選擇方向";
+}
+
+function message(text) {
+  document.getElementById("message").textContent = text;
+}
+
+function finish(success) {
+  game.done = success;
+  game.failed = !success;
+
+  const result = document.getElementById("result");
+  result.hidden = false;
+
+  result.innerHTML = success
+    ? "<h2>🎉 成功返航！</h2><p>你帶著寶藏平安回到出發港口，幽靈海域挑戰完成！</p>"
+    : "<h2>🌊 航行中止</h2><p>船隻耐久耗盡，這趟航行失敗了。重新出航再試一次吧！</p>";
+
+  document.getElementById("instruction").textContent =
+    success ? "摩根船長向你舉起酒杯！" : "摩根船長協助你返回港口整備。";
+
+  render();
+}
+
+function sail() {
+  if(!selected || game.done || game.failed) return;
+
+  const [dx,dy] = directions[selected];
+  const nx = game.x + dx;
+  const ny = game.y + dy;
+
+  if(nx<0 || nx>=W || ny<0 || ny>=H) {
+    message("前方是海域邊界，無法繼續前進，請選擇其他方向！");
+    selected = null;
+    render();
     return;
   }
 
-  const s=arr[idx];
+  game.x = nx;
+  game.y = ny;
+  game.steps++;
 
-  scene(`
-  <section class="panel">
-    <div class="scenehead">
-      <h2>🚢 幽靈海域・迷霧航行</h2>
-      <span class="npc">🏴‍☠️</span>
-    </div>
-    <p class="muted">
-      摩根將航線拆成逐步指示。照著提示前進即可，
-      不必看海圖，也不需要自己猜方向。
-    </p>
-    <div class="grid">
-      <div class="facility">
-        <h3>⛵ 船隻耐久</h3>
-        <div style="font-size:25px">
-          ${"❤️".repeat(state.seaHP)}${"🖤".repeat(4-state.seaHP)}
-        </div>
-      </div>
-      <div class="facility">
-        <h3>🧰 補給箱</h3>
-        <div style="font-size:25px">
-          ${"📦".repeat(state.seaSupplies)}${"▫️".repeat(2-state.seaSupplies)}
-        </div>
-      </div>
-    </div>
-    <hr class="separator">
-    <div class="hero panel">
-      <div style="font-size:62px">${s[0]}</div>
-      <h2>${s[1]}</h2>
-      <p class="muted">${s[2]}</p>
-      <div class="tag">${state.seaTreasure?"返航路線":"尋寶航線"}・第 ${idx+1} / ${arr.length} 步</div>
-    </div>
-    <div class="row">
-      <button onclick="seaAdvance()">確認方向，前進</button>
-      <button onclick="seaRepair()" ${state.seaSupplies<=0||state.seaHP>=4?"disabled":""}>
-        使用補給修理（耐久 +1）
-      </button>
-      <button onclick="home()">放棄航行</button>
-    </div>
-  </section>
-  `);
-}
+  const key = ${nx},${ny};
+  game.visited.add(key);
+  selected = null;
 
-window.seaAdvance=()=>{
-  if(!state.seaTreasure&&state.seaStep===2){
-    state.seaHP--;
-    if(state.seaHP<=0){
-      seaFail();
+  if(key==="2,1" && !game.events.has("monster")) {
+    game.events.add("monster");
+    game.hp--;
+    message("🐙 海怪突然竄出！船隻耐久減少 1 點。");
+
+    if(game.hp<=0) {
+      finish(false);
       return;
     }
   }
-
-  state.seaStep++;
-
-  if(!state.seaTreasure&&state.seaStep===5){
-    state.seaTreasure=true;
-    state.seaStep=0;
-    scene(`
-      <section class="panel hero">
-        <div style="font-size:55px">💎</div>
-        <h2>找到星砂寶箱！</h2>
-        <p class="muted">
-          寶箱已安全放入船艙。現在請依照返航指示回到港口。
-        </p>
-        <button onclick="seaShow()">開始返航</button>
-      </section>
-    `);
+  else if(key==="1,3" && !game.events.has("supply")) {
+    game.events.add("supply");
+    game.supply++;
+    message("🧰 你發現補給小島，獲得一份備用補給！");
+  }
+  else if(key==="3,3" && !game.events.has("fog")) {
+    game.events.add("fog");
+    message("🌫️ 濃霧籠罩海面！小心確認航行方向。");
+  }
+  else if(nx===treasure.x && ny===treasure.y && !game.found) {
+    game.found = true;
+    message("💎 找到了！寶藏就在船上。現在請自行選擇方向，返回左上角的出發港口！");
+  }
+  else if(nx===0 && ny===0 && game.found) {
+    finish(true);
     return;
   }
+  else if(nx===0 && ny===0) {
+    message("你回到了出發港口，但寶藏還沒找到。繼續探索吧！");
+  }
+  else {
+    message(game.found
+      ? "寶藏已經到手，繼續尋找回港的路！"
+      : "海浪拍打著船身，繼續探索吧！");
+  }
 
-  seaShow();
-};
+  document.getElementById("instruction").textContent =
+    game.found ? "寶藏已找到，請返航！" : "選擇下一段航程的方向。";
 
-function seaFail(){
-  scene(`
-    <section class="panel">
-      <h2>船隻失去動力</h2>
-      <p class="muted">船隻耐久歸零，這次航行失敗了。你可以立即重新挑戰。</p>
-      <button onclick="enter('sea')">重新航行</button>
-      <button onclick="home()">返回樂園</button>
-    </section>
-  `);
+  render();
 }
 
-window.seaRepair=()=>{
-  if(state.seaSupplies>0&&state.seaHP<4){
-    state.seaSupplies--;
-    state.seaHP=Math.min(4,state.seaHP+1);
-    seaShow();
+document.querySelectorAll("[data-dir]").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    if(game.done || game.failed) return;
+    selected = btn.dataset.dir;
+    render();
+  });
+});
+
+document.getElementById("sail").addEventListener("click",sail);
+
+document.getElementById("repair").addEventListener("click",()=>{
+  if(game.supply>0 && game.hp<3 && !game.done && !game.failed) {
+    game.supply--;
+    game.hp++;
+    message("🧰 使用一份補給，船隻耐久恢復 1 點！");
+    render();
   }
-};
+});
+
+document.getElementById("restart").addEventListener("click",newGame);
+
+newGame();
 
 /* 秘密花園 */
 function garden(){
