@@ -1,0 +1,919 @@
+
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>萬聖奇幻樂園：午夜狂歡</title>
+<style>
+:root{
+  --bg:#100d20;--panel:#211a35;--panel2:#302440;
+  --gold:#f4c879;--pink:#f2a8c7;--mint:#a9e4d0;
+  --text:#f8f0e5;--muted:#c3b7d2;--line:#57466e;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;color:var(--text);
+  font-family:"Noto Sans TC",system-ui,sans-serif;
+  background:radial-gradient(circle at 20% 0%,#39264f,#171127 48%,#0c0a16);
+  min-height:100vh;
+}
+button,input{font:inherit}
+button{
+  cursor:pointer;border:1px solid #806493;
+  background:linear-gradient(135deg,#684779,#443052);
+  color:white;padding:11px 16px;border-radius:12px;
+  transition:.18s;
+}
+button:hover{filter:brightness(1.17);transform:translateY(-1px)}
+button:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.wrap{max-width:1120px;margin:auto;padding:22px}
+.top{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.brand{font-size:clamp(22px,4vw,34px);font-weight:900;color:var(--gold);letter-spacing:2px}
+.sub{color:var(--muted);font-size:14px}
+.stats{display:flex;gap:8px;flex-wrap:wrap}
+.pill{background:#2b2143;border:1px solid var(--line);border-radius:999px;padding:7px 12px;font-size:13px}
+main{margin-top:22px}
+.panel{
+  background:linear-gradient(145deg,#251c38ee,#171326f2);
+  border:1px solid var(--line);border-radius:20px;
+  padding:22px;box-shadow:0 15px 45px #0005;margin-bottom:18px;
+}
+.hero{padding:34px;text-align:center;background:linear-gradient(135deg,#372345,#1a1730 70%)}
+h1{font-size:clamp(27px,5vw,44px);margin:8px 0;color:var(--gold)}
+h2{color:var(--gold);margin:0 0 12px}
+h3{margin:0 0 8px;color:#f5d7a1}
+p{line-height:1.8}
+.muted{color:var(--muted);line-height:1.8}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:13px}
+.facility{
+  min-height:180px;display:flex;flex-direction:column;
+  justify-content:space-between;background:linear-gradient(145deg,#302342,#20182f);
+  border:1px solid var(--line);border-radius:17px;padding:17px;
+}
+.facility .emoji{font-size:35px}
+.facility p{color:var(--muted);font-size:14px}
+.done{border-color:#8dcdb7;box-shadow:inset 0 0 0 1px #8dcdb755}
+.tag{font-size:12px;color:var(--mint)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.wide{width:100%}
+.choice{display:block;width:100%;text-align:left;margin:8px 0;background:#302541;border-color:#655176}
+.choice.correct{border-color:var(--mint)}
+.choice.wrong{border-color:#f18b8b}
+.question{font-size:18px;line-height:1.9;margin:14px 0}
+.input{background:#120e20;color:white;border:1px solid #75618b;border-radius:10px;padding:11px;width:min(100%,340px)}
+.feedback{padding:12px;border-radius:12px;background:#302541;margin-top:12px;line-height:1.7}
+.good{color:var(--mint)}
+.bad{color:#ffaaaa}
+.stamp{display:inline-flex;align-items:center;gap:6px;padding:8px 11px;margin:4px;border-radius:10px;background:#3b2c4c;border:1px solid #8b709c}
+.npc{font-size:44px;float:right;margin:0 0 10px 12px}
+.small{font-size:13px}
+.separator{border:0;border-top:1px solid var(--line);margin:18px 0}
+.hidden{display:none!important}
+.maze{
+  display:grid;grid-template-columns:repeat(6,minmax(30px,48px));
+  gap:5px;margin:18px auto;justify-content:center;
+}
+.cell{
+  aspect-ratio:1;border-radius:7px;display:grid;place-items:center;
+  background:#3b304b;border:1px solid #675477;font-size:19px;
+}
+.wall{background:#100d19;color:#51475b}
+.player{background:#7b5590}
+.goal{background:#9a743b}
+footer{text-align:center;color:#867b99;font-size:12px;padding:20px}
+@media(max-width:600px){
+  .wrap{padding:12px}.panel{padding:16px}.hero{padding:25px 16px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div>
+    <div class="brand">🎃 萬聖奇幻樂園</div>
+    <div class="sub">午夜狂歡・尋回失落的南瓜之心</div>
+  </div>
+  <div class="stats">
+    <span class="pill" id="playerLabel">旅人：未命名</span>
+    <span class="pill" id="stampLabel">印章 0 / 5</span>
+    <span class="pill" id="souvenirLabel">紀念品 0 / 5</span>
+  </div>
+</header>
+<main id="app"></main>
+<footer>萬聖奇幻樂園・願每個願望都能被好好聽見</footer>
+</div>
+
+<script>
+(()=>{
+"use strict";
+
+const $=id=>document.getElementById(id);
+const KEY="halloween_midnight_v4";
+
+const fresh=()=>({
+  name:"",
+  avatar:"🧙",
+  stamps:[],
+  souvenirs:[],
+  clues:{},
+  memories:[],
+  best:{},
+  ending:"",
+  seenIntro:false
+});
+
+let save;
+try{save=JSON.parse(localStorage.getItem(KEY))||fresh()}
+catch(e){save=fresh()}
+
+let state={
+  facility:null,
+  seaStep:0,
+  seaTreasure:false,
+  seaHP:4,
+  seaSupplies:2,
+  mazePos:0,
+  mazeMoves:18
+};
+
+function persist(){
+  localStorage.setItem(KEY,JSON.stringify(save));
+  updateHeader();
+}
+
+function updateHeader(){
+  $("playerLabel").textContent="旅人："+(save.name||"未命名");
+  $("stampLabel").textContent=`印章 ${save.stamps.length} / 5`;
+  $("souvenirLabel").textContent=`紀念品 ${save.souvenirs.length} / 5`;
+}
+
+function scene(html){
+  $("app").innerHTML=html;
+  updateHeader();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function home(){
+  const facilities=[
+    ["candy","🍬","糖果工坊","蜜露的魔法糖果訂單","數字線索","魔法糖果罐"],
+    ["castle","🏚️","午夜古堡","諾克的失落密碼","符號線索","古堡水晶鑰匙"],
+    ["pumpkin","🎃","南瓜工坊","咕嚕的雕刻委託","顏色線索","魔法南瓜燈"],
+    ["fair","🎪","詭異遊樂場","皮克的幽靈嘉年華","方向線索","幽靈遊樂場獎牌"],
+    ["sea","🚢","幽靈海域","摩根的迷霧尋寶航行","圖案線索","幽靈船長的航海羅盤"]
+  ];
+
+  scene(`
+  <section class="panel hero">
+    <div style="font-size:48px">🌙 ✨ 🎃 ✨ 🌙</div>
+    <h1>歡迎來到午夜狂歡</h1>
+    <p class="muted">
+      五座設施的魔法逐漸減弱，傳說中的南瓜之心也不知去向。<br>
+      完成設施、收集印章，找出藏在樂園深處的真相吧。
+    </p>
+    ${!save.name?`
+      <div class="row" style="justify-content:center;margin-top:18px">
+        <input id="nameInput" class="input" maxlength="14" placeholder="輸入你的旅人暱稱">
+        <select id="avatarInput" class="input" style="width:100px">
+          <option>🧙</option><option>🧛</option><option>🧟</option>
+          <option>🦇</option><option>👻</option><option>🧚</option>
+        </select>
+        <button onclick="startName()">進入樂園</button>
+      </div>
+    `:`
+      <p class="tag">旅人 ${escapeHTML(save.name)}，今晚的冒險正等著你。</p>
+      <button onclick="showIntro()">查看故事序章</button>
+    `}
+  </section>
+
+  <section class="panel">
+    <h2>🎠 樂園地圖</h2>
+    <p class="muted">五座設施可以自由選擇順序，首次通關取得紀念品與印章，之後仍可重玩。</p>
+    <div class="grid">
+      ${facilities.map(f=>`
+        <article class="facility ${save.stamps.includes(f[0])?"done":""}">
+          <div>
+            <div class="emoji">${f[1]}</div>
+            <h3>${f[2]}</h3>
+            <p>${f[3]}</p>
+            <div class="tag">${save.stamps.includes(f[0])?"✓ 已取得印章":"尚未通關"} · ${f[4]}</div>
+          </div>
+          <button onclick="enter('${f[0]}')">${save.stamps.includes(f[0])?"再次挑戰":"進入設施"}</button>
+        </article>
+      `).join("")}
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>🎒 旅人收藏</h2>
+    <div>
+      ${facilities.map(f=>`
+        <span class="stamp">${save.souvenirs.includes(f[0])?"✦":"◇"} ${f[5]}</span>
+      `).join("")}
+    </div>
+    <hr class="separator">
+    <h3>🌿 秘密花園</h3>
+    <p class="muted">
+      ${save.stamps.length===5
+        ?"五枚印章已集齊，中央廣場的地下入口已經開啟。"
+        :"集齊五枚設施印章，便能開啟中央廣場的地下入口。"}
+    </p>
+    <button ${save.stamps.length<5?"disabled":""} onclick="garden()">前往秘密花園</button>
+    ${save.ending?`<p class="good">已完成結局：${save.ending}</p>`:""}
+  </section>
+  `);
+}
+
+function escapeHTML(s){
+  return String(s).replace(/[&<>"']/g,c=>({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
+window.startName=()=>{
+  const n=$("nameInput").value.trim();
+  if(!n){alert("請先輸入旅人暱稱");return}
+  save.name=n;
+  save.avatar=$("avatarInput").value;
+  persist();
+  showIntro();
+};
+
+window.showIntro=()=>scene(`
+<section class="panel">
+  <div class="npc">🎃</div>
+  <h2>故事序章・南瓜之心</h2>
+  <p class="muted">
+    很久以前，樂園創辦人在古老森林裡找到一顆有生命的南瓜之心。
+    它能分享魔法，讓糖果擁有奇妙滋味、古堡亮起幽光、南瓜燈綻放笑容，
+    也讓整座樂園充滿歡樂。
+  </p>
+  <p class="muted">
+    居民漸漸習慣了它的魔力，卻忘了它也有自己的願望。
+    它想看看沒有魔法的森林、真正的星星，以及海的另一邊；
+    它想知道，除了替大家帶來光芒，自己還能成為什麼。
+  </p>
+  <p class="muted">
+    某個夜晚，它悄悄離開中央廣場，躲進樂園深處的秘密花園。
+    它並非想傷害任何人，只是希望有人願意聽聽它的心聲。
+  </p>
+  <button onclick="home()">我明白了，開始探索</button>
+</section>
+`);
+
+window.enter=id=>{
+  state.facility=id;
+  ({
+    candy:candyStart,
+    castle:castleStart,
+    pumpkin:pumpkinStart,
+    fair:fairStart,
+    sea:seaStart
+  })[id]();
+};
+
+function complete(id,clue,souvenir){
+  if(!save.stamps.includes(id)){
+    save.stamps.push(id);
+    save.souvenirs.push(id);
+    save.clues[id]=clue;
+    save.memories.push(id);
+    persist();
+  }
+
+  scene(`
+  <section class="panel hero">
+    <div style="font-size:55px">🏅✨</div>
+    <h2>設施挑戰成功！</h2>
+    <p class="muted">你獲得了「${souvenir}」與一枚印章。</p>
+    <div class="stamp">線索：${clue}</div>
+    <p class="muted">這是南瓜之心留下的一段記憶碎片。</p>
+    <button onclick="home()">返回樂園</button>
+    <button onclick="enter('${id}')">再玩一次</button>
+  </section>
+  `);
+}
+
+function question(title,npc,desc,q,opts,correct,next,retry){
+  scene(`
+  <section class="panel">
+    <div class="scenehead">
+      <h2>${title}</h2>
+      <span class="npc">${npc}</span>
+    </div>
+    <p class="muted">${desc}</p>
+    <hr class="separator">
+    <div class="question">${q}</div>
+    <div id="options">
+      ${opts.map((o,i)=>`
+        <button class="choice" onclick="answerQuestion(${i})">
+          ${String.fromCharCode(65+i)}. ${o}
+        </button>
+      `).join("")}
+    </div>
+    <div id="fb"></div>
+  </section>
+  `);
+
+  window.answerQuestion=i=>{
+    const buttons=[...document.querySelectorAll(".choice")];
+    buttons.forEach(b=>b.disabled=true);
+
+    if(i===correct){
+      buttons[i].classList.add("correct");
+      $("fb").innerHTML=`
+        <div class="feedback good">答對了！推理正確。</div>
+        <button onclick="${next}">繼續</button>
+      `;
+    }else{
+      buttons[i].classList.add("wrong");
+      $("fb").innerHTML=`
+        <div class="feedback bad">答案不正確。請重新檢查題目條件，再試一次。</div>
+        <button onclick="${retry}">重新思考</button>
+      `;
+    }
+  };
+}
+
+/* 糖果工坊：三階段推理 */
+function candyStart(){candyQ1()}
+
+function candyQ1(){
+  question(
+    "🍬 糖果工坊・材料辨識","🧙‍♀️",
+    "蜜露有五種材料。月光糖必須同時符合：能在黑暗中發光、遇水不溶解。只有一種材料符合。",
+    "材料紀錄如下，哪一種可以使用？",
+    [
+      "螢光砂：會發光，遇水溶解",
+      "星塵晶：會發光，遇水不溶",
+      "霜糖：不發光，遇水不溶",
+      "夜露珠：不發光，遇水溶解"
+    ],
+    1,"candyQ2()","candyQ1()"
+  );
+}
+
+function candyQ2(){
+  question(
+    "🍬 糖果工坊・配方排列","🧙‍♀️",
+    "配方有四種材料：霜糖、薄荷、莓果、星糖。規則：霜糖必須第一；星糖必須最後；薄荷不能緊接霜糖之後。",
+    "以下哪個順序符合所有條件？",
+    [
+      "霜糖 → 薄荷 → 莓果 → 星糖",
+      "霜糖 → 莓果 → 薄荷 → 星糖",
+      "薄荷 → 霜糖 → 莓果 → 星糖",
+      "霜糖 → 星糖 → 莓果 → 薄荷"
+    ],
+    1,"candyQ3()","candyQ2()"
+  );
+}
+
+function candyQ3(){
+  question(
+    "🍬 糖果工坊・最後訂單","🧙‍♀️",
+    "客人訂購 36 顆糖。紅色糖比藍色糖多 6 顆，黃色糖是藍色糖的兩倍。三種糖合計 36 顆。",
+    "紅、藍、黃各有幾顆？",
+    [
+      "紅 12、藍 6、黃 18",
+      "紅 14、藍 8、黃 14",
+      "紅 15、藍 9、黃 12",
+      "紅 16、藍 10、黃 10"
+    ],
+    0,
+    "complete('candy','數字：6・12・18','魔法糖果罐')",
+    "candyQ3()"
+  );
+}
+
+/* 午夜古堡：符號與真假話推理 */
+function castleStart(){castleQ1()}
+
+function castleQ1(){
+  question(
+    "🏚️ 午夜古堡・鏡像密碼","👻",
+    "鏡子會讓符號左右順序顛倒，但不會旋轉或改變符號本身。",
+    "原文為：☽ ◆ ♜ ✦ ♡。鏡中會看到哪一串？",
+    [
+      "♡ ✦ ♜ ◆ ☽",
+      "☽ ◆ ✦ ♜ ♡",
+      "♜ ✦ ☽ ♡ ◆",
+      "◆ ☽ ♡ ♜ ✦"
+    ],
+    0,"castleQ2()","castleQ1()"
+  );
+}
+
+function castleQ2(){
+  question(
+    "🏚️ 午夜古堡・真假話","👻",
+    "甲、乙、丙三位幽靈中，只有一人說真話。甲說：「鑰匙在乙手上。」乙說：「鑰匙不在我手上。」丙說：「鑰匙不在甲手上。」",
+    "鑰匙在誰手上，才能讓只有一人說真話？",
+    ["甲","乙","丙","無法判定"],
+    0,"castleQ3()","castleQ2()"
+  );
+}
+
+function castleQ3(){
+  question(
+    "🏚️ 午夜古堡・最終密碼","👻",
+    "密碼是三位數。百位是十位的兩倍；個位比十位多 1；三個數字相加等於 13。",
+    "正確密碼是哪一組？",
+    ["643","625","436","835"],
+    0,
+    "complete('castle','符號：☽ ◆ ✦','古堡水晶鑰匙')",
+    "castleQ3()"
+  );
+}
+
+/* 南瓜工坊：條件判斷 */
+function pumpkinStart(){pumpkinEye()}
+
+function pumpkinEye(){
+  scene(`
+  <section class="panel">
+    <div class="npc">🎃</div>
+    <h2>南瓜工坊・雕刻委託</h2>
+    <p class="muted">咕嚕要求你製作一盞符合全部條件的南瓜燈。</p>
+    <hr class="separator">
+    <div class="question">
+      第一項條件：眼睛必須一大一小，而且左眼比右眼大。
+    </div>
+    <div class="row">
+      <button onclick="pumpEye(0)">兩眼一樣大</button>
+      <button onclick="pumpEye(1)">左大右小</button>
+      <button onclick="pumpEye(2)">左小右大</button>
+    </div>
+  </section>
+  `);
+}
+
+window.pumpEye=i=>{
+  if(i!==1){pumpkinEye();return}
+  pumpkinMouth();
+};
+
+function pumpkinMouth(){
+  scene(`
+  <section class="panel">
+    <h2>南瓜工坊・第二步</h2>
+    <p class="muted">嘴巴需要五個尖角。已知尖角數必須是奇數，且大於 3、小於 7。</p>
+    <div class="row">
+      <button onclick="pumpMouthAns(0)">三個尖角</button>
+      <button onclick="pumpMouthAns(1)">五個尖角</button>
+      <button onclick="pumpMouthAns(2)">六個尖角</button>
+      <button onclick="pumpMouthAns(3)">七個尖角</button>
+    </div>
+  </section>
+  `);
+}
+
+window.pumpMouthAns=i=>{
+  if(i!==1){pumpkinMouth();return}
+  pumpkinLight();
+};
+
+function pumpkinLight(){
+  scene(`
+  <section class="panel">
+    <h2>南瓜工坊・最後一步</h2>
+    <p class="muted">
+      燈光不能是紅色或藍色；色相比綠色更暖，
+      但又不能像橘色那麼濃烈。
+    </p>
+    <div class="row">
+      <button onclick="pumpLightAns(0)">🔴 紅光</button>
+      <button onclick="pumpLightAns(1)">🟢 綠光</button>
+      <button onclick="pumpLightAns(2)">🟡 金黃光</button>
+      <button onclick="pumpLightAns(3)">🟠 橘光</button>
+      <button onclick="pumpLightAns(4)">🔵 藍光</button>
+    </div>
+  </section>
+  `);
+}
+
+window.pumpLightAns=i=>{
+  if(i!==2){pumpkinLight();return}
+  complete("pumpkin","顏色：金黃","魔法南瓜燈");
+};
+
+/* 詭異遊樂場：記憶、條件與計算 */
+function fairStart(){fairQ1()}
+
+function fairQ1(){
+  question(
+    "🎪 幽靈嘉年華・記憶規律","👻",
+    "主持人展示了一串圖案：🌙、🎃、🦇、⭐、🌙、🎃、🦇、？",
+    "依照規律，下一個圖案是什麼？",
+    ["🌙","🎃","🦇","⭐"],
+    3,"fairQ2()","fairQ1()"
+  );
+}
+
+function fairQ2(){
+  question(
+    "🎪 幽靈嘉年華・排列判斷","👻",
+    "四個圖案必須符合：月亮在最左；蝙蝠緊接月亮右側；星星不能在南瓜左邊。",
+    "以下哪個排列符合條件？",
+    [
+      "🎃 🌙 🦇 ⭐",
+      "🌙 🦇 🎃 ⭐",
+      "⭐ 🌙 🦇 🎃",
+      "🌙 🎃 🦇 ⭐"
+    ],
+    1,"fairQ3()","fairQ2()"
+  );
+}
+
+function fairQ3(){
+  question(
+    "🎪 幽靈嘉年華・投擲計算","👻",
+    "投擲得分：中心 5 分、內圈 3 分、外圈 1 分。你有四次機會，分別命中中心、外圈、內圈、內圈。通關需要至少 12 分。",
+    "你的總分是多少？",
+    ["10 分","11 分","12 分","13 分"],
+    2,
+    "complete('fair','方向：北・東・南','幽靈遊樂場獎牌')",
+    "fairQ3()"
+  );
+}
+
+/* 幽靈海域：逐步方向操控 */
+const outward=[
+  ["⬆️","向北航行","海面平靜，遠處有微弱燈光。"],
+  ["➡️","向東航行","霧氣變濃，請留意航道。"],
+  ["⬇️","向南航行","海怪突然從浪底竄出！船身受到撞擊，耐久 -1。"],
+  ["➡️","向東航行","你看見海面浮起一圈金色光芒。"],
+  ["⬆️","向北航行","寶藏就在前方！你取得了星砂寶箱。"]
+];
+
+const inward=[
+  ["⬇️","向南返航","沿著燈塔光線往南。"],
+  ["⬅️","向西返航","避開礁石，往西行進。"],
+  ["⬇️","向南返航","港口已經出現在眼前！"]
+];
+
+function seaStart(){
+  state.seaStep=0;
+  state.seaTreasure=false;
+  state.seaHP=4;
+  state.seaSupplies=2;
+  seaShow();
+}
+
+function seaShow(){
+  const arr=state.seaTreasure?inward:outward;
+  const idx=state.seaStep;
+
+  if(idx>=arr.length){
+    if(!state.seaTreasure){
+      state.seaTreasure=true;
+      state.seaStep=0;
+      seaShow();
+    }else{
+      complete("sea","圖案：羅盤・星砂・波浪","幽靈船長的航海羅盤");
+    }
+    return;
+  }
+
+  const s=arr[idx];
+
+  scene(`
+  <section class="panel">
+    <div class="scenehead">
+      <h2>🚢 幽靈海域・迷霧航行</h2>
+      <span class="npc">🏴‍☠️</span>
+    </div>
+    <p class="muted">
+      摩根將航線拆成逐步指示。照著提示前進即可，
+      不必看海圖，也不需要自己猜方向。
+    </p>
+    <div class="grid">
+      <div class="facility">
+        <h3>⛵ 船隻耐久</h3>
+        <div style="font-size:25px">
+          ${"❤️".repeat(state.seaHP)}${"🖤".repeat(4-state.seaHP)}
+        </div>
+      </div>
+      <div class="facility">
+        <h3>🧰 補給箱</h3>
+        <div style="font-size:25px">
+          ${"📦".repeat(state.seaSupplies)}${"▫️".repeat(2-state.seaSupplies)}
+        </div>
+      </div>
+    </div>
+    <hr class="separator">
+    <div class="hero panel">
+      <div style="font-size:62px">${s[0]}</div>
+      <h2>${s[1]}</h2>
+      <p class="muted">${s[2]}</p>
+      <div class="tag">${state.seaTreasure?"返航路線":"尋寶航線"}・第 ${idx+1} / ${arr.length} 步</div>
+    </div>
+    <div class="row">
+      <button onclick="seaAdvance()">確認方向，前進</button>
+      <button onclick="seaRepair()" ${state.seaSupplies<=0||state.seaHP>=4?"disabled":""}>
+        使用補給修理（耐久 +1）
+      </button>
+      <button onclick="home()">放棄航行</button>
+    </div>
+  </section>
+  `);
+}
+
+window.seaAdvance=()=>{
+  if(!state.seaTreasure&&state.seaStep===2){
+    state.seaHP--;
+    if(state.seaHP<=0){
+      seaFail();
+      return;
+    }
+  }
+
+  state.seaStep++;
+
+  if(!state.seaTreasure&&state.seaStep===5){
+    state.seaTreasure=true;
+    state.seaStep=0;
+    scene(`
+      <section class="panel hero">
+        <div style="font-size:55px">💎</div>
+        <h2>找到星砂寶箱！</h2>
+        <p class="muted">
+          寶箱已安全放入船艙。現在請依照返航指示回到港口。
+        </p>
+        <button onclick="seaShow()">開始返航</button>
+      </section>
+    `);
+    return;
+  }
+
+  seaShow();
+};
+
+function seaFail(){
+  scene(`
+    <section class="panel">
+      <h2>船隻失去動力</h2>
+      <p class="muted">船隻耐久歸零，這次航行失敗了。你可以立即重新挑戰。</p>
+      <button onclick="enter('sea')">重新航行</button>
+      <button onclick="home()">返回樂園</button>
+    </section>
+  `);
+}
+
+window.seaRepair=()=>{
+  if(state.seaSupplies>0&&state.seaHP<4){
+    state.seaSupplies--;
+    state.seaHP=Math.min(4,state.seaHP+1);
+    seaShow();
+  }
+};
+
+/* 秘密花園 */
+function garden(){
+  if(save.stamps.length<5)return;
+
+  const order=["candy","castle","pumpkin","fair","sea"];
+  const names=["數字","符號","顏色","方向","圖案"];
+
+  scene(`
+  <section class="panel">
+    <h2>🌿 遺忘的秘密花園</h2>
+    <p class="muted">
+      五座設施的線索依序出現在五座石碑上。
+      讀完所有線索，試著理解南瓜之心為何離開。
+    </p>
+    <div class="grid">
+      ${order.map((id,i)=>`
+        <div class="facility">
+          <h3>${i+1}. ${names[i]}石碑</h3>
+          <p>${save.clues[id]||"尚無線索"}</p>
+        </div>
+      `).join("")}
+    </div>
+    <hr class="separator">
+    <div class="question">
+      石碑浮現一句話：<br>
+      「若你只想帶走它，便永遠找不到它。若你願意聽見它的心聲，真正的道路才會顯現。」
+    </div>
+    <p class="muted">南瓜之心離開的真正原因是什麼？</p>
+    <div id="gardenOpts">
+      <button class="choice" onclick="gardenAnswer(0)">
+        它想奪走樂園的魔法，讓大家失去歡樂。
+      </button>
+      <button class="choice" onclick="gardenAnswer(1)">
+        它想擁有自己的選擇，看看世界，而不只是一直提供魔力。
+      </button>
+      <button class="choice" onclick="gardenAnswer(2)">
+        它想懲罰居民，讓大家為忽略它而後悔。
+      </button>
+    </div>
+    <div id="gardenFb"></div>
+  </section>
+  `);
+}
+
+window.gardenAnswer=i=>{
+  if(i!==1){
+    $("gardenFb").innerHTML=`
+      <div class="feedback bad">
+        石碑沒有反應。請再想想南瓜之心一路留下的記憶。
+      </div>
+    `;
+    return;
+  }
+
+  $("gardenFb").innerHTML=`
+    <div class="feedback good">
+      五座石碑同時亮起，花園深處出現一條通道。
+    </div>
+    <button onclick="mazeStart()">進入南瓜之心的迷途</button>
+  `;
+};
+
+/* 迷宮 */
+const mazeWalls=new Set([7,8,15,19,25,26,27,32]);
+
+function mazeStart(){
+  state.mazePos=0;
+  state.mazeMoves=18;
+  drawMaze();
+}
+
+function drawMaze(){
+  let cells="";
+
+  for(let i=0;i<36;i++){
+    let ch=mazeWalls.has(i)?"▧":
+      i===state.mazePos?"🧙":
+      i===35?"🎃":
+      i===0?"🚪":"·";
+
+    cells+=`
+      <div class="cell ${mazeWalls.has(i)?"wall":""}
+        ${i===state.mazePos?"player":""}
+        ${i===35?"goal":""}>${ch}</div>
+    `;
+  }
+
+  scene(`
+  <section class="panel">
+    <h2>🌀 南瓜之心的迷途</h2>
+    <p class="muted">
+      這座迷宮由南瓜之心的記憶形成。
+      牆壁無法通過，請移動到右下角的南瓜燈。
+      你有 18 步，失敗可以立即重試。
+    </p>
+    <div class="row" style="justify-content:center">
+      <span class="pill">剩餘步數：${state.mazeMoves}</span>
+      <span class="pill">
+        位置：第 ${Math.floor(state.mazePos/6)+1} 行・第 ${state.mazePos%6+1} 列
+      </span>
+    </div>
+    <div class="maze">${cells}</div>
+    <div class="row" style="justify-content:center">
+      <button onclick="mazeMove(0,-1)">⬆️ 上</button>
+      <button onclick="mazeMove(-1,0)">⬅️ 左</button>
+      <button onclick="mazeMove(1,0)">➡️ 右</button>
+      <button onclick="mazeMove(0,1)">⬇️ 下</button>
+    </div>
+    <p class="muted small">
+      提示：從入口沿著上方通道向右，再沿最右側往下即可抵達出口。
+    </p>
+    <button onclick="mazeStart()">重新開始</button>
+  </section>
+  `);
+}
+
+window.mazeMove=(dx,dy)=>{
+  const x=state.mazePos%6;
+  const y=Math.floor(state.mazePos/6);
+  const nx=x+dx;
+  const ny=y+dy;
+
+  if(nx<0||nx>5||ny<0||ny>5)return;
+
+  const p=ny*6+nx;
+  if(mazeWalls.has(p))return;
+
+  state.mazePos=p;
+  state.mazeMoves--;
+
+  if(p===35){
+    meetHeart();
+    return;
+  }
+
+  if(state.mazeMoves<=0){
+    scene(`
+      <section class="panel">
+        <h2>迷宮中的記憶散去了</h2>
+        <p class="muted">步數已經用盡，重新整理思緒再試一次吧。</p>
+        <button onclick="mazeStart()">重新挑戰</button>
+        <button onclick="home()">返回樂園</button>
+      </section>
+    `);
+    return;
+  }
+
+  drawMaze();
+};
+
+/* 南瓜之心與結局 */
+function meetHeart(){
+  scene(`
+  <section class="panel hero">
+    <div style="font-size:64px">🎃</div>
+    <h2>找到南瓜之心</h2>
+    <p class="question">「你們……是來帶我回去的嗎？」</p>
+    <p class="muted">
+      「我只是想在這裡待一會兒。我想看看真正的星星，
+      想去海的另一邊，也想知道……如果不必一直為大家提供魔力，
+      我還能做些什麼。這樣的願望，是不是有點自私呢？」
+    </p>
+    <button onclick="heartReply()">我想聽聽你的願望</button>
+  </section>
+  `);
+}
+
+function heartReply(){
+  scene(`
+  <section class="panel">
+    <h2>南瓜之心的願望</h2>
+    <p class="question">你會怎麼回答它？</p>
+
+    <button class="choice" onclick="endingChoice('溫暖的歸途')">
+      「你的願望一點也不自私。若你願意，我們可以一起回去，讓大家學會分擔。」
+    </button>
+
+    <button class="choice" onclick="endingChoice('遠方的星光')">
+      「那麼，接下來你想去哪裡呢？我願意陪你看看世界。」
+    </button>
+
+    <button class="choice" onclick="endingChoice('永遠的萬聖夜')">
+      「你不必再獨自承擔。樂園可以學會自己運轉，而你可以自由決定留下或出發。」
+    </button>
+
+    ${save.memories.length===5?`
+      <button class="choice" onclick="endingChoice('最初的願望')">
+        「我想知道，你最初的願望是什麼。讓我們一起找回那段記憶。」
+      </button>
+    `:""}
+  </section>
+  `);
+}
+
+window.endingChoice=name=>{
+  save.ending=name;
+  persist();
+
+  const descriptions={
+    "溫暖的歸途":
+      "你沒有要求它立刻回去，而是邀請居民分擔維持樂園魔法的工作。南瓜之心願意回到大家身邊，也終於能說出自己需要休息的時候。",
+    "遠方的星光":
+      "摩根借出幽靈船，陪南瓜之心前往海的另一邊。它第一次以自己的步伐探索世界，樂園也開始學習不依賴單一顆心。",
+    "永遠的萬聖夜":
+      "居民一起建立新的魔法循環。南瓜之心不再是唯一的魔力來源，它可以留下，也可以旅行；無論選哪一條路，大家都會尊重它。",
+    "最初的願望":
+      "你們找回了它最初的記憶。它曾是森林裡承載眾人願望的南瓜燈，如今終於明白，自己也可以擁有願望。"
+  };
+
+  const titles={
+    "溫暖的歸途":"歸家的旅人",
+    "遠方的星光":"追尋星光者",
+    "永遠的萬聖夜":"南瓜之心的祝福",
+    "最初的願望":"最初的見證者"
+  };
+
+  scene(`
+  <section class="panel hero">
+    <div style="font-size:60px">🌟🎃🌟</div>
+    <h2>結局：${name}</h2>
+    <p class="muted">${descriptions[name]}</p>
+    <div class="stamp">獲得稱號：${titles[name]}</div>
+    <p class="good">你完成了午夜狂歡的故事。</p>
+    <button onclick="home()">回到樂園</button>
+  </section>
+  `);
+};
+
+// 將 HTML 按鈕需要呼叫的函式公開
+Object.assign(window, {
+  home,
+  complete,
+  garden,
+  mazeStart,
+  candyQ2,
+  candyQ3,
+  castleQ2,
+  castleQ3,
+  fairQ2,
+  fairQ3
+});
+
+window.onload=()=>{
+  updateHeader();
+  home();
+};
+})();
+</script>
+</body>
+</html>
